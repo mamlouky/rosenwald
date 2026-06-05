@@ -1,4 +1,4 @@
-# Rosenwald — Extraction structurée et analyse des listes « géographiques » des Guides Rosenwald (1887-1922).
+# Quantifying The Invisible: Extraction structurée et analyse des listes « géographiques » des Guides Rosenwald (1887-1922).
 
 Pipeline de transformation des pages numérisées des **Guides Rosenwald** en
 données tabulaires exploitables, avec une attention particulière aux **femmes
