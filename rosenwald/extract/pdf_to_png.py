@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable, List
 
-import fitz  # PyMuPDF
+import fitz  
 from PIL import Image
 
 

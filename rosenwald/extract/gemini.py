@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import subprocess
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -9,7 +10,12 @@ from typing import Any, Dict, Optional
 import requests
 
 
-GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
+def _get_access_token() -> str:
+    result = subprocess.run(
+        "gcloud auth print-access-token",
+        capture_output=True, text=True, check=True, shell=True,
+    )
+    return result.stdout.strip()
 
 # Human-readable labels for context fields injected into the prompt
 _CONTEXT_LABELS: Dict[str, str] = {
@@ -32,20 +38,26 @@ def gemini_extract_tsv_from_image_http(
     image_path: Path,
     year: int,
     pdf_page: int,
-    model: str,              # e.g. "models/gemini-2.5-flash"
-    api_key: str,
+    model: str,              # "gemini-2.5-flash"
+    api_key: str,            # ignored (kept for backward compatibility)
     prompt_template: str,
     prev_context: Optional[Dict[str, str]] = None,
     timeout_s: int = 180,
+    gcp_project: str = "rosenwald",
+    gcp_location: str = "europe-west6",
 ) -> str:
     """
-    Calls Gemini API generateContent via REST.
+    Calls Gemini via Vertex AI REST API.
 
     prev_context: dict of {field_name: last_seen_value} from the previous page.
     These are injected into the prompt so Gemini can carry values forward
     when a page starts mid-section (no header visible).
     """
-    url = f"{GEMINI_API_BASE}/{model}:generateContent"
+    url = (
+        f"https://{gcp_location}-aiplatform.googleapis.com/v1"
+        f"/projects/{gcp_project}/locations/{gcp_location}"
+        f"/publishers/google/models/{model}:generateContent"
+    )
 
     # Build the optional context section
     context_section = ""
@@ -86,16 +98,18 @@ def gemini_extract_tsv_from_image_http(
         ],
         "generationConfig": {
             "temperature": 0.0,
+            "thinkingConfig": {"thinkingBudget": 0},
         },
     }
 
+    access_token = _get_access_token()
     headers = {
         "Content-Type": "application/json",
-        "x-goog-api-key": api_key,
+        "Authorization": f"Bearer {access_token}",
     }
 
     last_exc: Exception = RuntimeError("No attempts made")
-    for attempt in range(2):          # 1 attempt + 1 retry
+    for attempt in range(4):          # up to 4 attempts on rate-limit
         try:
             r = requests.post(url, headers=headers, data=json.dumps(payload), timeout=timeout_s)
         except requests.exceptions.Timeout:
@@ -105,9 +119,8 @@ def gemini_extract_tsv_from_image_http(
             continue
 
         if r.status_code == 429:      # rate-limit: wait and retry
-            last_exc = RuntimeError(f"Gemini HTTP 429 rate-limit (attempt {attempt+1}/2)")
-            if attempt == 0:
-                time.sleep(30)
+            last_exc = RuntimeError(f"Gemini HTTP 429 rate-limit (attempt {attempt+1}/4)")
+            time.sleep(30 * (attempt + 1))   # 30s, 60s, 90s
             continue
 
         if r.status_code != 200:

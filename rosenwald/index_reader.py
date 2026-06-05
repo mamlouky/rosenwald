@@ -21,7 +21,7 @@ class ListSection:
     list_type: str   # see _classify() below
     list_name: str   # raw name from Excel
     localisation: str
-    notes: str = ""  # raw notes from column 6 (e.g. "inversée")
+    notes: str = ""  # raw notes from column 6 
 
     @property
     def pages(self) -> range:
@@ -69,10 +69,7 @@ def _classify(list_name: str, localisation: str) -> str:
     return "unknown"
 
 
-# ─────────────────────────────────────────────
 # Internal XML helpers
-# ─────────────────────────────────────────────
-
 def _read_shared_strings(z: zipfile.ZipFile) -> List[str]:
     strings: List[str] = []
     if "xl/sharedStrings.xml" in z.namelist():
@@ -103,10 +100,7 @@ def _parse_sheet(z: zipfile.ZipFile, sheet_path: str, strings: List[str]) -> Lis
     return rows
 
 
-# ─────────────────────────────────────────────
 # Public API
-# ─────────────────────────────────────────────
-
 def read_index(excel_path: Path = EXCEL_PATH) -> List[ListSection]:
     """Return all list sections across all years from the Excel index."""
     sections: List[ListSection] = []
